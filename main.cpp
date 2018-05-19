@@ -1,251 +1,161 @@
 #include <iostream>
 
-#include <SFML/Graphics.hpp>
+#include <clever/IostreamFunctions.hpp>
+#include <clever/SFML/Widgets.hpp>
 
+#include "CellPrinter.hpp"
+#include "CellularAutomaton.hpp"
+
+using namespace clever;
 using namespace sf;
 using namespace std;
 
 
-RenderWindow window(VideoMode::getDesktopMode(), "Cellular Automaton", Style::None);
-Color backgroundcolor = Color::White;
+typedef int8_t value_type;
+
+RenderWindow window;
+VideoMode dsmode = VideoMode::getDesktopMode();
+string const TITLE = "Cellular Automaton";
+unsigned int const FRAMERATE_LIMIT = 60;
+Color const WINDOW_BACKGROUND_COLOR = Color(0xe6, 0x8e, 0x50);
+
 Event event;
 
-unsigned short int width = 30, height = 15;
-uint8_t *field;
+Field<value_type> field{nullptr, 0, 0};
+unsigned int const K_FIELD_SIZE = 30; 
+float const K_PANEL_HEIGHT = 0.075f; 
 
-Color cellcolors[2] = {
-	Color(0xff, 0x66, 0x66),
-	Color(0xff, 0x0, 0x0)
-};
-uint8_t lastcolor = 0;
+FieldAdapter<value_type, CellPrinter<value_type>> fieldadapter;
+CellularAutomaton automaton;
+unsigned int age = 0; 
 
-float sidelen, borderlen;
-float kborderatsize = 0.05;
-Vector2f printpos = { 0.0, 0.0 };
-RectangleShape rectangle;
+ChangingObject<string> lifestatus("Life: 0"), agestatus("Age:  0");
 
-void print_field()
+void init_window()
 {
-	for(unsigned short int y = 0; y < height; ++y) {
-		for(unsigned short int x = 0; x < width; ++x) {
-			cout << field[y*width+x] << ' ';
-		}
-		cout << '\n';
-	}
+	window.create(dsmode, TITLE, Style::None);
+	window.setPosition({0, 0});
+	window.setFramerateLimit(FRAMERATE_LIMIT);
 	return;
 }
 
-void print_info()
+
+void init_field()
 {
-	std::cout << "window.size = <" << window.getSize().x << ", " << window.getSize().y << ">" << std::endl;
-	std::cout << "width = " << width << ", height = " << height << std::endl;
-	print_field();
-	std::cout << "lastcolor = " << lastcolor << std::endl;
-	std::cout << "sidelen = " << sidelen << ", borderlen = " << borderlen << std::endl;
-	std::cout << "printpos = <" << printpos.x << ", " << printpos.y << ">" << std::endl;
-	return;
-}
+	if(field.d)
+		delete field.d;
+	field.w = dsmode.width/K_FIELD_SIZE;
+	field.h = (dsmode.height*(1-K_PANEL_HEIGHT))/K_FIELD_SIZE;
+	field.d = new value_type[field.w*field.h];
+
+	field.clear();
 	
-
-void init_field(uint8_t defvalue = 0)
-{
-	if(field)
-		delete[] field;
-	field = new uint8_t[width*height];
-	for(unsigned short int i = 0; i < width*height; ++i) {
-		field[i] = defvalue;
-	}
 	return;
 }
 
-void init_rectangle()
+void init_fieldadapter()
 {
-	float fulllen;
-	auto winsize = window.getSize();
-	fulllen = min(float(winsize.x)/width, float(winsize.y)/height);
-	
-	sidelen = fulllen/(1+2*kborderatsize);
-	borderlen = (fulllen-sidelen)/2;
+	fieldadapter.setField(&field);
+	fieldadapter.setSize(
+		{float(dsmode.width), float(dsmode.height)}
+	);
+	fieldadapter.setDrawBoundsEnable(false);
+	fieldadapter.setGridColor(Color(0x47, 0x00, 0x27));
 
-	printpos.x = (winsize.x-fulllen*width)/2;
-	printpos.y = (winsize.y-fulllen*height)/2;
-
-	rectangle.setSize({sidelen, sidelen});
-	rectangle.setFillColor(cellcolors[lastcolor]);
 	return;
 }
 
-void init_all()
+void init_automaton()
 {
-	init_field();
-	init_rectangle();
-}
-
-void draw_field()
-{
-	rectangle.setPosition(printpos.x+borderlen, printpos.y+borderlen);
-	for(unsigned short int y = 0; y < height; ++y) {
-		rectangle.setPosition(printpos.x+borderlen, printpos.y+borderlen+y*(sidelen+borderlen*2));
-		for(unsigned short int x = 0; x < width; ++x) {
-			if(field[y*width+x]) {
-				if(lastcolor != field[y*width+x]-1) {
-					lastcolor = field[y*width+x]-1;
-					rectangle.setFillColor(cellcolors[lastcolor]);
-				}
-				window.draw(rectangle);
-			}
-			rectangle.move(sidelen+borderlen, 0.0);
-		}
-	}
-}
-
-void sfml_update_field()
-{
-	int toset = 2;
-	if(Mouse::isButtonPressed(Mouse::Left) || (toset = 0) || Mouse::isButtonPressed(Mouse::Right)) {
-		auto mousepos = Mouse::getPosition();
-		int x = (mousepos.x-printpos.x)/(sidelen+borderlen);
-		if(x < 0 || x >= width)
-			return;
-		int y = (mousepos.y-printpos.y)/(sidelen+borderlen);
-		if(y < 0 || y >= height)
-			return;
-		field[y*width+x] = toset;
-	}
+	automaton.field(&field);
+	automaton.atType(CellularAutomaton::simpleat);
 	return;
 }
 
-uint8_t tape_at(unsigned short int x, unsigned short int y)
+
+
+void update()
 {
-	if(x < 0) do
-		x += width;
-	while(x < 0);
-	else while(x >= width)
-		x -= width;
-
-	if(y < 0) do
-		y += height;
-	while(y < 0);
-	else while(y >= height)
-		y -= height;
-
-	return field[y*width+x];
-}
-
-uint8_t simple_at(unsigned short int x, unsigned short int y)
-{
-	if(x < 0 || x >= width || y < 0 || y >= height)
-		return 0;
-	else 
-		return field[y*width+x];
-}
-
-uint8_t (*at)(unsigned short int, unsigned short int) = &tape_at;
-
-uint8_t life_predicate(unsigned short int x, unsigned short int y)
-{
-	unsigned short int c = 0;
-	if(at(x-1, y-1))
-		++c;
-	if(at(x, y-1))
-		++c;
-	if(at(x+1, y-1))
-		++c;
-
-	if(at(x-1, y))
-		++c;
-	if(at(x+1, y))
-		++c;
-	
-
-	if(at(x-1, y+1))
-		++c;
-	if(at(x, y+1))
-		++c;
-	if(at(x+1, y+1))
-		++c;
-
-	if(at(x, y))
-		return c == 2 || c == 3 ? 1 : 0;
-	else
-		return c == 3 ? 1 : 0;
-}
-
-uint8_t hard_life_predicate(unsigned short int x, unsigned short int y)
-{
-	unsigned short int c = 0;
-	c += at(x-1, y-1);
-	c += at(x, y-1);
-	c += at(x+1, y-1);
-
-	c += at(x-1, y);
-	c += at(x+1, y);
-
-	c += at(x-1, y+1);
-	c += at(x, y+1);
-	c += at(x+1, y+1);
-	
-	if(at(x, y) == 2)
-		return c >= 4 && c <= 6 ? 2 : 1;
-	else if(at(x, y) == 1)
-		return c >= 5 && c <= 7 ? 2 : 0;
-	else 
-		return c == 6 || c == 7 ? 1 : 0;
-}
-
-uint8_t (*predicate)(unsigned short int, unsigned short int) = &hard_life_predicate;
-
-void two_dimensional_update_field()
-{
-	static unsigned short int lastwidth = width, lastheight = height;
-	static uint8_t *swapfield = new uint8_t[lastwidth*lastheight];
-	if(lastwidth != width || lastheight != height) {
-		delete[] swapfield;
-		lastwidth = width;
-		lastheight= height;
-		swapfield = new uint8_t[lastwidth*lastheight];
-	}
-	for(unsigned short int y = 0; y < lastheight; ++y) {
-		for(unsigned short int x = 0; x < lastwidth; ++x) {
-			swapfield[y*lastwidth+x] = predicate(x, y);
-		}
-	}
-	std::swap(field, swapfield);
+	automaton.update();
+	++age;
+	agestatus.change(string("Age: ") + to_string(age));
+	lifestatus.change(
+		string("Life: ")+
+		to_string(automaton.alive())
+	);
 	return;
 }
-
-void (*update_field)() = &two_dimensional_update_field;
 
 int main(int argc, char const *argv[])
 {
-	init_all();
-	window.setPosition({0, 0});
-	window.setFramerateLimit(120);
+	init_window();
+	init_field();
+	init_fieldadapter();
+	init_automaton();
 
+
+	WidgetFactory factory;
+
+	auto lifebar = factory.createStatusBar(2, &lifestatus);
+	lifebar->updateSpace(2.0f, 0.0f);
+	auto agebar = factory.createStatusBar(2, &agestatus);
+	lifebar->updateSpace(2.0f, 0.0f);
+
+	auto statuspanel = factory.createLayout(
+		0, Layout::horizontal, {lifebar, agebar}
+	);
+	auto mainpanel = factory.createLayout(
+		0, Layout::vertical, {&fieldadapter, statuspanel}
+	);
+	
 	while(window.isOpen()) {
 		if(window.pollEvent(event)) {
 			switch(event.type) {
 			case Event::KeyPressed:
 				switch(event.key.code) {
-				case Keyboard::C: case Keyboard::Escape:
+				case Keyboard::C:
 					window.close();
 					break;
 				case Keyboard::R:
-					init_field();
+					field.clear();
+					age = 0;
+					agestatus.change("Age: 0");
+					lifestatus.change("Life: 0");
+					break;
+				case Keyboard::U:
+					update();
+					break;
 				default:
-					update_field();
 					break;
 				}
 			default:
 				break;
 			}
 		}
+		
 
-		sfml_update_field();
+		if(Mouse::isButtonPressed(Mouse::Button::Left)) {
+			auto pos = fieldadapter.cursorOn(
+				conversion<float>(Mouse::getPosition())-
+				fieldadapter.getPosition()
+			);
+			if(pos.first != -1) {
+				field.at(pos.first, pos.second) = 1;
+			}
+		}
+		if(Keyboard::isKeyPressed(Keyboard::Space))
+			update();
 
-		window.clear(backgroundcolor);
-		draw_field();
+
+		mainpanel->update(0.0f);
+		window.clear(WINDOW_BACKGROUND_COLOR);
+		window.draw(*mainpanel);
 		window.display();
 	}
+
 	return 0;
 }
+
+
+
+// end.

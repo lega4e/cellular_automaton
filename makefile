@@ -1,10 +1,26 @@
-all: test.out
+CC=g++
+CFLAGS=-c -Wall -O3
+LDFLAGS=
+LIBS=-lclever-sfmlwidgets -lsfml-graphics -lsfml-window -lsfml-system
+SOURCES=main.cpp CellularAutomaton.cpp
+OBJECTS=$(SOURCES:.cpp=.o)
+EXECUTABLE=cellular_automaton
 
-cellular_automaton.out: main.cpp
-	g++ -o cellular_automaton.out main.cpp -lsfml-graphics -lsfml-window -lsfml-system
+all: $(SOURCES) $(EXECUTABLE)
+	$(EXECUTABLE)
 
-test.out: test.cpp SFMLFieldAdapter.hpp
-	g++ -o test.out test.cpp -lsfml-graphics -lsfml-window -lsfml-system
+reall: clearall all
+	
+
+$(EXECUTABLE): $(OBJECTS)
+	$(CC) $(LDFLAGS) $(OBJECTS) -o $@ $(LIBS)
+
+.cpp.o:
+	$(CC) $(CFLAGS) $< -o $@
+
 
 clear:
 	rm *.o
+
+clearall: clear
+	rm $(EXECUTABLE)

@@ -21,7 +21,7 @@ Color const WINDOW_BACKGROUND_COLOR = Color(0xe6, 0x8e, 0x50);
 
 Event event;
 
-Field<value_type> field{nullptr, 0, 0};
+Field<value_type> field{0, 0, nullptr};
 unsigned int const K_FIELD_SIZE = 30; 
 float const K_PANEL_HEIGHT = 0.075f; 
 

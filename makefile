@@ -9,7 +9,7 @@ EXECUTABLE=cellular_automaton
 all: $(SOURCES) $(EXECUTABLE)
 	$(EXECUTABLE)
 
-reall: clearall all
+reall: cleanall all
 	
 
 $(EXECUTABLE): $(OBJECTS)
@@ -19,8 +19,6 @@ $(EXECUTABLE): $(OBJECTS)
 	$(CC) $(CFLAGS) $< -o $@
 
 
-clear:
-	rm *.o
+clean:
+	rm *.o $(EXECUTABLE)
 
-clearall: clear
-	rm $(EXECUTABLE)

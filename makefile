@@ -2,14 +2,14 @@ CC=g++
 CFLAGS=-c -Wall -O3
 LDFLAGS=
 LIBS=-lclever-sfmlwidgets -lsfml-graphics -lsfml-window -lsfml-system
-SOURCES=main.cpp CellularAutomaton.cpp
+SOURCES=main.cpp bot.cpp botfield.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 EXECUTABLE=cellular_automaton
 
 all: $(SOURCES) $(EXECUTABLE)
 	$(EXECUTABLE)
 
-reall: clearall all
+reall: cleanall all
 	
 
 $(EXECUTABLE): $(OBJECTS)
@@ -19,8 +19,8 @@ $(EXECUTABLE): $(OBJECTS)
 	$(CC) $(CFLAGS) $< -o $@
 
 
-clear:
-	rm *.o
 
-clearall: clear
-	rm $(EXECUTABLE)
+
+clean:
+	rm *.o $(EXECUTABLE)
+

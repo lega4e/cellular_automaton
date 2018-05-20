@@ -1,32 +1,33 @@
+#include <iomanip>
 #include <iostream>
 
 #include <clever/IostreamFunctions.hpp>
 #include <clever/SFML/Widgets.hpp>
 
+#include "bot.hpp"
+#include "botfield.hpp"
 #include "CellPrinter.hpp"
-#include "CellularAutomaton.hpp"
 
 using namespace clever;
 using namespace sf;
 using namespace std;
 
 
-typedef int8_t value_type;
 
 RenderWindow window;
 VideoMode dsmode = VideoMode::getDesktopMode();
 string const TITLE = "Cellular Automaton";
 unsigned int const FRAMERATE_LIMIT = 60;
-Color const WINDOW_BACKGROUND_COLOR = Color(0xe6, 0x8e, 0x50);
+Color const WINDOW_BACKGROUND_COLOR = Color(0xde, 0xaa, 0x88);
 
 Event event;
 
-Field<value_type> field{nullptr, 0, 0};
-unsigned int const K_FIELD_SIZE = 30; 
+unsigned int const K_FIELD_SIZE = 120; 
 float const K_PANEL_HEIGHT = 0.075f; 
 
-FieldAdapter<value_type, CellPrinter<value_type>> fieldadapter;
-CellularAutomaton automaton;
+FieldAdapter<Cell, CellPrinter<Cell>> fieldadapter;
+
+BotField field;
 unsigned int age = 0; 
 
 ChangingObject<string> lifestatus("Life: 0"), agestatus("Age:  0");
@@ -39,23 +40,20 @@ void init_window()
 	return;
 }
 
-
 void init_field()
 {
-	if(field.d)
-		delete field.d;
-	field.w = dsmode.width/K_FIELD_SIZE;
-	field.h = (dsmode.height*(1-K_PANEL_HEIGHT))/K_FIELD_SIZE;
-	field.d = new value_type[field.w*field.h];
-
-	field.clear();
-	
+	Field<Cell> f;
+	f.w = 60;
+	f.h = 30;
+	f.d = new Cell[f.w*f.h];
+	field.setField(move(f));
+	field.getField().clear({false, nullptr});
 	return;
 }
 
 void init_fieldadapter()
 {
-	fieldadapter.setField(&field);
+	fieldadapter.setField(&field.getField());
 	fieldadapter.setSize(
 		{float(dsmode.width), float(dsmode.height)}
 	);
@@ -65,33 +63,61 @@ void init_fieldadapter()
 	return;
 }
 
-void init_automaton()
+
+
+void print_field(Field<Cell> const &f)
 {
-	automaton.field(&field);
-	automaton.atType(CellularAutomaton::simpleat);
+	for(unsigned int y = 0; y < f.h; ++y) {
+		for(unsigned int x = 0; x < f.w; ++x) {
+			if(f.at(x, y).bot) {
+				cout << 'b';
+			}
+			else if(f.at(x, y).haveFood) {
+				cout << 'e';
+			}
+			else
+				cout << '0';
+			cout << ' ';
+		}
+		cout << '\n';
+	}
 	return;
 }
-
-
 
 void update()
 {
-	automaton.update();
+	field.update();
 	++age;
 	agestatus.change(string("Age: ") + to_string(age));
-	lifestatus.change(
-		string("Life: ")+
-		to_string(automaton.alive())
-	);
 	return;
 }
+
+void print_bot(Bot const &bot)
+{
+	cout << setprecision(2);
+	cout.setf(ostream::ios_base::fixed);
+	cout << "Chromosome: \n" << bot.getChromosome() << endl;
+	cout << "Bot: \n" << bot << endl;
+	return;
+}
+
+void print_info(float x, float y) 
+{
+	auto p = fieldadapter.cursorOn(sf::Vector2f({x, y})-fieldadapter.getPosition());
+	if(p.first == -1 || !field.getField().at(p.first, p.second).bot)
+		return;
+	print_bot(
+		*field.getField().at(p.first, p.second).bot
+	);
+}
+
+
 
 int main(int argc, char const *argv[])
 {
 	init_window();
 	init_field();
 	init_fieldadapter();
-	init_automaton();
 
 
 	WidgetFactory factory;
@@ -107,6 +133,7 @@ int main(int argc, char const *argv[])
 	auto mainpanel = factory.createLayout(
 		0, Layout::vertical, {&fieldadapter, statuspanel}
 	);
+	bool right;
 	
 	while(window.isOpen()) {
 		if(window.pollEvent(event)) {
@@ -117,13 +144,20 @@ int main(int argc, char const *argv[])
 					window.close();
 					break;
 				case Keyboard::R:
-					field.clear();
+					field.getField().
+						clear({false, nullptr});
 					age = 0;
 					agestatus.change("Age: 0");
 					lifestatus.change("Life: 0");
 					break;
 				case Keyboard::U:
 					update();
+					break;
+				case Keyboard::I:
+					print_info(
+						Mouse::getPosition().x,
+						Mouse::getPosition().y
+					);
 					break;
 				default:
 					break;
@@ -134,17 +168,26 @@ int main(int argc, char const *argv[])
 		}
 		
 
-		if(Mouse::isButtonPressed(Mouse::Button::Left)) {
+		right = false;
+		if(Mouse::isButtonPressed(Mouse::Button::Left) ||
+			!(right = true) || Mouse::isButtonPressed(Mouse::Button::Right)) {
 			auto pos = fieldadapter.cursorOn(
 				conversion<float>(Mouse::getPosition())-
 				fieldadapter.getPosition()
 			);
 			if(pos.first != -1) {
-				field.at(pos.first, pos.second) = 1;
+				if(!right)
+					field.getField().
+						at(pos.first, pos.second).
+							bot = new Bot;
+				else
+					field.getField().at(pos.first, pos.second).
+						haveFood = true;
 			}
 		}
-		if(Keyboard::isKeyPressed(Keyboard::Space))
+		if(Keyboard::isKeyPressed(Keyboard::Space)) {
 			update();
+		}
 
 
 		mainpanel->update(0.0f);

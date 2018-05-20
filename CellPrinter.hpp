@@ -9,7 +9,7 @@ public:
 	typedef ValueType value_type;
 
 	CellPrinter(
-		value_type value = 0,
+		value_type value = value_type(),
 		sf::Vector2f const &size = {0.0f, 0.0f},
 		sf::Vector2f const &position = {0.0f, 0.0f}
 	): _value(value)
@@ -37,7 +37,8 @@ public:
 	}
 	void setValue(value_type value)
 	{
-		if(_value != value) {
+		if(_value.haveFood != value.haveFood ||
+			_value.bot != value.bot) {
 			_value = value;
 			_value_dispatch();
 		}
@@ -78,8 +79,19 @@ public:
 private:
 	void _value_dispatch()
 	{
-		if(_value)
-			_rectangle.setFillColor(sf::Color(0x8a, 0x45, 0x13));
+		if(_value.haveFood)
+			_rectangle.setFillColor(sf::Color(0x00, 0x4d, 0x00));
+		else if(_value.bot) {
+			float energy = _value.bot->getEnergy();
+			if(energy < 1000.0f) {
+				float k = energy/1000.0f;
+				_rectangle.setFillColor(sf::Color(
+					0xf7*k, 0x5e*k, 0x25*k
+				));
+			}
+			else
+				_rectangle.setFillColor(sf::Color(0xf7, 0x5e, 0x25));
+		}
 		else
 			_rectangle.setFillColor(sf::Color::Transparent);
 		return;

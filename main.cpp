@@ -1,17 +1,20 @@
+#include <ctime>
 #include <iostream>
+#include <random>
 
 #include <clever/IostreamFunctions.hpp>
 #include <clever/SFML/Widgets.hpp>
 
+#include "BotField.hpp"
 #include "CellPrinter.hpp"
-#include "CellularAutomaton.hpp"
 
 using namespace clever;
 using namespace sf;
 using namespace std;
 
 
-typedef int8_t value_type;
+
+BotField botfield;
 
 RenderWindow window;
 VideoMode dsmode = VideoMode::getDesktopMode();
@@ -21,15 +24,27 @@ Color const WINDOW_BACKGROUND_COLOR = Color(0xe6, 0x8e, 0x50);
 
 Event event;
 
-Field<value_type> field{0, 0, nullptr};
-unsigned int const K_FIELD_SIZE = 30; 
-float const K_PANEL_HEIGHT = 0.075f; 
+template<> 
+void CellPrinter<Cell>::_value_dispatch()
+{
+	switch(_value.what) {
+	case Cell::nothing:
+		_rectangle.setFillColor(Color::Transparent);
+		break;
+	case Cell::plant:
+		_rectangle.setFillColor(Color(0x13, 0x88, 0x08));
+		break;
+	case Cell::herbivorous:
+		_rectangle.setFillColor(Color(0x8a, 0x45, 0x13));
+		break;
+	default:
+		throw "invalid cell";
+	}
+	return;
+}
 
-FieldAdapter<value_type, CellPrinter<value_type>> fieldadapter;
-CellularAutomaton automaton;
-unsigned int age = 0; 
-
-ChangingObject<string> lifestatus("Life: 0"), agestatus("Age:  0");
+FieldAdapter<Cell, CellPrinter<Cell>> fieldadapter;
+int age = 0;
 
 void init_window()
 {
@@ -39,25 +54,17 @@ void init_window()
 	return;
 }
 
-
-void init_field()
+void init_botfield()
 {
-	if(field.d)
-		delete field.d;
-	field.w = dsmode.width/K_FIELD_SIZE;
-	field.h = (dsmode.height*(1-K_PANEL_HEIGHT))/K_FIELD_SIZE;
-	field.d = new value_type[field.w*field.h];
-
-	field.clear();
-	
+	botfield.setField({80, 40});
 	return;
 }
 
 void init_fieldadapter()
 {
-	fieldadapter.setField(&field);
+	fieldadapter.setField(&botfield.getField());
 	fieldadapter.setSize(
-		{float(dsmode.width), float(dsmode.height)}
+		{float(dsmode.width), float(dsmode.height-200)}
 	);
 	fieldadapter.setDrawBoundsEnable(false);
 	fieldadapter.setGridColor(Color(0x47, 0x00, 0x27));
@@ -65,49 +72,26 @@ void init_fieldadapter()
 	return;
 }
 
-void init_automaton()
-{
-	automaton.field(&field);
-	automaton.atType(CellularAutomaton::simpleat);
-	return;
-}
 
 
-
-void update()
-{
-	automaton.update();
-	++age;
-	agestatus.change(string("Age: ") + to_string(age));
-	lifestatus.change(
-		string("Life: ")+
-		to_string(automaton.alive())
-	);
-	return;
-}
 
 int main(int argc, char const *argv[])
 {
+	srand(time(0));
 	init_window();
-	init_field();
+	init_botfield();
 	init_fieldadapter();
-	init_automaton();
-
 
 	WidgetFactory factory;
 
-	auto lifebar = factory.createStatusBar(2, &lifestatus);
-	lifebar->updateSpace(2.0f, 0.0f);
-	auto agebar = factory.createStatusBar(2, &agestatus);
-	lifebar->updateSpace(2.0f, 0.0f);
+	ChangingObject<string> agestatus("Age: 0");
 
-	auto statuspanel = factory.createLayout(
-		0, Layout::horizontal, {lifebar, agebar}
-	);
+	auto agestatusbar = factory.createStatusBar(1, &agestatus);
+	agestatusbar->updateSpace(2.0f, 1.0f);
 	auto mainpanel = factory.createLayout(
-		0, Layout::vertical, {&fieldadapter, statuspanel}
+		0, Layout::vertical, {&fieldadapter, agestatusbar}
 	);
-	
+
 	while(window.isOpen()) {
 		if(window.pollEvent(event)) {
 			switch(event.type) {
@@ -117,13 +101,14 @@ int main(int argc, char const *argv[])
 					window.close();
 					break;
 				case Keyboard::R:
-					field.clear();
+					botfield.clear();
 					age = 0;
-					agestatus.change("Age: 0");
-					lifestatus.change("Life: 0");
+					agestatus.change("Age: "+to_string(age));
 					break;
 				case Keyboard::U:
-					update();
+					botfield.update();
+					++age;
+					agestatus.change("Age: "+to_string(age));
 					break;
 				default:
 					break;
@@ -140,12 +125,23 @@ int main(int argc, char const *argv[])
 				fieldadapter.getPosition()
 			);
 			if(pos.first != -1) {
-				field.at(pos.first, pos.second) = 1;
+				if(botfield.getField().at(pos).what == Cell::herbivorous) {
+					botfield.getField().at(pos).to<Herbivorous>()->
+						print(cout) << endl;
+				}
+				else {
+					botfield.addThing(
+						pos.first, pos.second,
+						{Cell::herbivorous, new Herbivorous}
+					);
+				}
 			}
 		}
-		if(Keyboard::isKeyPressed(Keyboard::Space))
-			update();
-
+		if(Keyboard::isKeyPressed(Keyboard::Space)) {
+			botfield.update();
+			++age;
+			agestatus.change("Age: "+to_string(age));
+		}
 
 		mainpanel->update(0.0f);
 		window.clear(WINDOW_BACKGROUND_COLOR);

@@ -9,7 +9,7 @@ public:
 	typedef ValueType value_type;
 
 	CellPrinter(
-		value_type value = 0,
+		value_type const &value = value_type(),
 		sf::Vector2f const &size = {0.0f, 0.0f},
 		sf::Vector2f const &position = {0.0f, 0.0f}
 	): _value(value)
@@ -19,6 +19,7 @@ public:
 		_rectangle.setPosition(position);
 		return;
 	}
+
 	~CellPrinter() {}
 
 
@@ -31,20 +32,18 @@ public:
 		return;
 	}
 
-	value_type getValue() const
+	value_type const &getValue() const
 	{
 		return _value;
 	}
-	void setValue(value_type value)
+	void setValue(value_type const &value)
 	{
-		if(_value != value) {
-			_value = value;
-			_value_dispatch();
-		}
+		_value = value;
+		_value_dispatch();
 		return;
 	}
 
-	sf::Vector2f getSize() const
+	sf::Vector2f const &getSize() const
 	{
 		return _rectangle.getSize();
 	}
@@ -76,19 +75,22 @@ public:
 	}
 
 private:
-	void _value_dispatch()
-	{
-		if(_value)
-			_rectangle.setFillColor(sf::Color(0x8a, 0x45, 0x13));
-		else
-			_rectangle.setFillColor(sf::Color::Transparent);
-		return;
-	}
+	void _value_dispatch();
 
 	value_type _value;
 	sf::RectangleShape _rectangle;
 
 };
+
+template<typename ValueType>
+void CellPrinter<ValueType>::_value_dispatch()
+{
+	if(_value)
+		_rectangle.setFillColor(sf::Color(0x8a, 0x45, 0x13));
+	else
+		_rectangle.setFillColor(sf::Color::Transparent);
+	return;
+}
 
 
 #endif // INT_PRINTER_HPP

@@ -1,8 +1,8 @@
 CC=g++
-CFLAGS=-c -Wall -O3
+CFLAGS=-c -Wall -std=c++1z
 LDFLAGS=
 LIBS=-lclever-sfmlwidgets -lsfml-graphics -lsfml-window -lsfml-system
-SOURCES=main.cpp CellularAutomaton.cpp
+SOURCES=main.cpp Plant.cpp Herbivorous.cpp Predator.cpp BotField.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 EXECUTABLE=cellular_automaton
 
